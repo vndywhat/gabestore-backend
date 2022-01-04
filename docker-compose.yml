@@ -1,0 +1,75 @@
+version: '3'
+services:
+    web:
+        container_name: gabestore-web
+        image: nginx:latest
+        depends_on:
+            - mysqldb
+            - php
+        volumes:
+            - ./:/var/www/html
+            - ./docker/etc/nginx:/etc/nginx/conf.d
+        ports:
+            - 8000:80
+    php:
+        container_name: gabestore-php
+        depends_on:
+            - mysqldb
+            - redis
+        build:
+            args:
+                user: www
+                uid: 1000
+            context: ./docker/php
+            dockerfile: Dockerfile
+        volumes:
+            - ./docker/entrypoint.sh:/var/entrypoint.sh
+            - ./:/var/www/html
+            - ./docker/etc/php:/usr/local/etc/php/php.ini
+        command: "php-fpm"
+    adminer:
+        container_name: gabestore-aminer
+        image: adminer
+        ports:
+            - 8080:8080
+        depends_on:
+            - mysqldb
+    mysqldb:
+        image: mysql:8.0.27
+        container_name: gabestore-mysql
+        environment:
+            - MYSQL_DATABASE=test
+            - MYSQL_ROOT_PASSWORD=root
+            - MYSQL_USER=dev
+            - MYSQL_PASSWORD=dev
+        ports:
+            - 3306:3306
+        volumes:
+            - ./docker/data/db/mysql:/var/lib/mysql
+    mailhog:
+        container_name: gabestore-mailhog
+        image: mailhog/mailhog
+        logging:
+            driver: 'none'  # disable saving logs
+        ports:
+            - 1025:1025 # smtp server
+            - 8025:8025 # web ui
+    queue:
+        container_name: gabestore-queue
+        depends_on:
+            - mysqldb
+            - php
+        build:
+            args:
+                user: www
+                uid: 1000
+            context: ./docker/php
+            dockerfile: Dockerfile
+        volumes:
+            - ./docker/entrypoint-queue.sh:/var/entrypoint.sh
+            - ./:/var/www/html
+            - ./docker/etc/php:/usr/local/etc/php/php.ini
+        command: "php artisan queue:work"
+    redis:
+        container_name: gabestore-redis
+        image: redis:6
